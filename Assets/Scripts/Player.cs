@@ -12,9 +12,12 @@ public class Player: MonoBehaviour
 
 	public float jumpForgiveness;
 	public float jumpGiveness;
+	
 
 	[ReadOnly]
 	public bool jumped;
+	[ReadOnly]
+	public bool canJump;
 	[ReadOnly]
 	public bool grounded;
 	[ReadOnly]
@@ -26,6 +29,11 @@ public class Player: MonoBehaviour
 	[ReadOnly]
 	public float timeSinceJumpAttempt;
 
+	[Header("Timmy")]
+	public float timmyTimeout;
+	[ReadOnly]
+	public float timeSinceTimmy;
+
 	void Update() {
 		timeSinceJumpAttempt += Time.deltaTime;
 		if (Input.GetButtonDown("Jump"))
@@ -36,6 +44,8 @@ public class Player: MonoBehaviour
 		float dx = Input.GetAxisRaw("Horizontal");
 		dx *= speed;
 		dx *= Time.deltaTime;
+
+		timeSinceTimmy += Time.deltaTime;
 		
 		// ground check
 		grounded = false;
@@ -61,18 +71,36 @@ public class Player: MonoBehaviour
 					print("goal");
 					StartCoroutine(Goal(collider.transform));
 				}
+				else if (layer == LayerMask.NameToLayer("TimmyTrigger"))
+				{
+					if (timeSinceTimmy >= timmyTimeout && canJump)
+					{
+						Jump();
+						float dist = GameManager.instance.goal.position.x - transform.position.x;
+						dx = speed * Mathf.Sign(dist);
 
-				break;
+						timeSinceTimmy = 0;
+					}
+				}
 			}
 
 		jumped &= timeSinceGrounded <= jumpForgiveness && timeSinceOrbded <= jumpForgiveness;
 
+		canJump = false;
 		if (!jumped)
 		{
-			if (timeSinceGrounded <= jumpForgiveness && Input.GetButton("Jump"))
-				Jump();
-			else if (timeSinceOrbded <= jumpForgiveness && timeSinceJumpAttempt <= jumpGiveness)
-				Jump();
+			if (timeSinceGrounded <= jumpForgiveness)
+			{
+				canJump = true;
+				if (Input.GetButton("Jump"))
+					Jump();
+			}
+			else if (timeSinceOrbded <= jumpForgiveness)
+			{
+				canJump = true;
+				if (timeSinceJumpAttempt <= jumpGiveness)
+					Jump();
+			}
 		}
 
 		rb.AddForce(new Vector2(dx, 0), ForceMode2D.Impulse);
@@ -81,6 +109,11 @@ public class Player: MonoBehaviour
 	public void Jump() {
 		rb.velocity = new Vector2(rb.velocity.x, jumpForce);
 		jumped = true;
+	}
+
+	public void TryJump() {
+		if (canJump)
+			Jump();
 	}
 
 	IEnumerator Goal(Transform goal) {
